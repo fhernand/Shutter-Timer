@@ -1,3 +1,14 @@
+
+#include <Adafruit_GFX.h>    // Core graphics library
+#include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
+#include <SPI.h>
+
+#define TFT_CS        10
+#define TFT_RST        9 // Or set to -1 and connect to Arduino RESET pin
+#define TFT_DC         8
+
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
+
 long Start;   // this is the time in microseconds that the shutter opens (the arduino runs a microsecond clock in the background always - it is reasonably accurate for this purpose)
 long Stop;    // this is the time in microseconds that the shutter closes
 int Fired = 0;  // this is a flag indicating when the shutter has been fired completely.  when fired =1, the shutter has been fired, and the computer needs to display the information related to the exposure time.
@@ -11,6 +22,9 @@ void setup() {                                                  //This part of t
   Serial.begin(9600);                                          //opens a serial connection.
   attachInterrupt(digitalPinToInterrupt(2), CLOCK, CHANGE);    //run the function CLOCK, every time the voltage on pin 2 changes.
 
+  tft.initR(INITR_144GREENTAB); // Init ST7735R chip, green tab
+  
+  tft.fillScreen(ST77XX_BLACK);
 }
 
 void loop() {                                                  // this part of the program is run, in order, over and over again, start to finish, unless INTERRUPTED by our interrupt
@@ -34,14 +48,36 @@ void loop() {                                                  // this part of t
   
 
     float SS = (float)Speed/1000000;    // make a variable SS, which is how many seconds that the shutter open for
-    float SS2 = 1/SS;                   // make a variable SS2, which is the inverse of the SS, or 1/ the shutter speed
-    Serial.print("shutter speed: 1/");
-    Serial.println(SS2);                //display the shutter speed
+    
+    char shutterTime[20] = "";
+    char shutterTimeInverse[18] = "";
+    Serial.print("shutter speed: ");    
+    if(SS >= 1){
+      dtostrf(SS,0,3,shutterTime);
+    } else {
+      dtostrf(1/SS,0,3,shutterTimeInverse);
+      sprintf(shutterTime,"1/%s",shutterTimeInverse);
+    }
+
+    Serial.println(shutterTime);                //display the shutter speed
     Serial.println();
+    printShutterTime(shutterTime, ST77XX_RED);
     Start = 0;                         // reset Start to 0
     Stop = 0;                           //reset Stop to 0 . *** these are not necessarily needed, but makes errors more evident should they occur
     Fired = 0;                          //reset Fired flag to 0, so that the shutter speed will not be calclulated and displayed, until the next full interrupt cycle, where a start and stop time are generated.
   } 
+}
+
+void printShutterTime(char *text, uint16_t color) {
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setCursor(10, 10);
+  tft.setTextColor(color);
+  tft.setTextWrap(true);
+  tft.setTextSize(1);
+  tft.println("Shutter speed (s):");
+  tft.setCursor(10, 30);  
+  tft.setTextSize(2);
+  tft.print(text);
 }
 
 void CLOCK(){                     //this is the interrupt function, which is called everytime the voltage on pin 2 changes, no matter where in the main program loop that the computer is currently in
@@ -52,4 +88,3 @@ void CLOCK(){                     //this is the interrupt function, which is cal
     Fallingflag =1;
   }
 }
-
